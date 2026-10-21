@@ -50,8 +50,6 @@ button:disabled{opacity:.5;cursor:default}
 .status{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
 .status.show{opacity:1}
 .err{background:#fde2e0;color:#7a1d14;border:1px solid #f1b3ab;border-radius:12px;padding:12px;margin-bottom:16px;display:none}
-.setup{text-align:center;padding:40px 16px}
-.share{display:flex;gap:8px;margin-top:14px}
 .small{font-size:.85rem;color:var(--muted)}
 .hidden{display:none}
 </style>
@@ -61,15 +59,6 @@ button:disabled{opacity:.5;cursor:default}
   <h1>Friendsgiving Potluck</h1>
   <p class="sub">Pick what your family is bringing. Everyone sees the same list.</p>
   <div class="err" id="err"></div>
-
-  <div id="setup" class="card setup hidden">
-    <p><b>First-time setup.</b> Click once to create your sign-up board.</p>
-    <button id="createBtn">Create the sign-up board</button>
-    <div id="shareBox" class="hidden">
-      <p style="margin-top:20px">Done. Send <b>this exact link</b> to the group. It includes your board's ID.</p>
-      <div class="share"><input id="shareLink" readonly><button id="copyBtn">Copy</button></div>
-    </div>
-  </div>
 
   <div id="app" class="hidden">
     <div class="card me">
@@ -98,7 +87,7 @@ button:disabled{opacity:.5;cursor:default}
 <div class="status" id="status"></div>
 
 <script>
-const API = "https://jsonblob.com/api/jsonBlob";
+const API = "https://textdb.dev/api/data/aa92b58f-e383-476e-b9cb-7fa83ba6500d";
 const PARTIES = ["M&J","H&K","K&L","J&C"];
 const CATS = ["Mains","Sides","Bread","Desserts","Kids","Drinks","Supplies"];
 const SEED = [
@@ -113,7 +102,6 @@ const SEED = [
 ];
 
 const $ = id => document.getElementById(id);
-let blobId = location.hash.replace("#","").trim();
 let data = null;
 let openClaim = null;
 let busy = false;
@@ -131,19 +119,20 @@ function seedData(){
 }
 
 async function load(){
-  const r=await fetch(API+"/"+blobId,{headers:{Accept:"application/json"},cache:"no-store"});
+  const r=await fetch(API,{cache:"no-store"});
   if(!r.ok) throw new Error("load "+r.status);
-  return r.json();
+  const t=(await r.text()).trim();
+  return t?JSON.parse(t):null;
 }
 async function save(d){
-  const r=await fetch(API+"/"+blobId,{method:"PUT",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(d)});
+  const r=await fetch(API,{method:"POST",headers:{"content-type":"text/plain"},body:JSON.stringify(d)});
   if(!r.ok) throw new Error("save "+r.status);
 }
 // Always re-read the latest copy before changing it, so two families saving at once don't wipe each other out.
 async function mutate(fn,msg){
   if(busy) return; busy=true;
   try{
-    const fresh=await load(); fn(fresh); await save(fresh); data=fresh; showErr(""); render(); if(msg) toast(msg);
+    const fresh=(await load())||seedData(); fn(fresh); await save(fresh); data=fresh; showErr(""); render(); if(msg) toast(msg);
   }catch(e){showErr("Couldn't save. Check your connection and try again.")}
   finally{busy=false}
 }
@@ -216,34 +205,14 @@ $("addBtn").onclick=()=>{
 $("newName").addEventListener("keydown",e=>{if(e.key==="Enter")$("addBtn").click()});
 $("meSel").onchange=e=>{setMe(e.target.value);showErr("");render()};
 
-// first-time setup
-$("createBtn").onclick=async()=>{
-  $("createBtn").disabled=true;
-  try{
-    const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(seedData())});
-    if(!r.ok) throw new Error(r.status);
-    const loc=r.headers.get("Location")||r.headers.get("location")||"";
-    let id=loc.split("/").pop();
-    if(!id) throw new Error("no id");
-    const link=location.href.split("#")[0]+"#"+id;
-    $("shareLink").value=link; $("shareBox").classList.remove("hidden"); $("createBtn").classList.add("hidden");
-    history.replaceState(null,"","#"+id);
-    $("copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText(link);toast("Link copied")}catch(e){$("shareLink").select()}};
-    const go=document.createElement("button");go.className="ghost";go.textContent="Open the board";go.style.marginTop="14px";
-    go.onclick=()=>location.reload();$("shareBox").appendChild(go);
-  }catch(e){$("createBtn").disabled=false;showErr("Setup failed. Try again in a minute.")}
-};
-
 async function start(){
   PARTIES.forEach(p=>{const o=document.createElement("option");o.value=p;o.textContent=p;$("meSel").appendChild(o)});
   CATS.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;$("newCat").appendChild(o)});
   $("meSel").value=getMe();
-  if(!blobId){$("setup").classList.remove("hidden");return}
   $("app").classList.remove("hidden");
-  try{data=await load();render()}catch(e){showErr("Couldn't load the list. Make sure you used the full link you were sent.")}
-  setInterval(async()=>{ if(busy||openClaim||document.querySelector(".allergy textarea")) return; try{data=await load();showErr("");render()}catch(e){} },15000);
+  try{data=await load(); if(!data){data=seedData(); await save(data);} render()}catch(e){showErr("Couldn't load the list. Refresh the page to try again.")}
+  setInterval(async()=>{ if(busy||openClaim||document.querySelector(".allergy textarea")) return; try{const d=await load(); if(d){data=d;showErr("");render()}}catch(e){} },15000);
 }
-window.addEventListener("hashchange",()=>location.reload());
 start();
 </script>
 </body>
