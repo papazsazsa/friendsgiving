@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Friendsgiving Potluck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f1e8;--card:#fffaf3;--ink:#2b2118;--muted:#7a6a5a;--line:#e6d8c4;
+  --accent:#b5521b;--accent-ink:#fff;--claimed:#eef3e6;--claimed-line:#c9d8b3;--warn:#fff1d6;--warn-line:#f0cf8a;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1c1712;--card:#26201a;--ink:#f3e9dc;--muted:#b3a291;--line:#3a3128;
+  --accent:#e0793d;--accent-ink:#1c1712;--claimed:#24301d;--claimed-line:#3d5230;--warn:#3a2f1a;--warn-line:#6b5428;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif}
+.wrap{max-width:820px;margin:0 auto;padding:28px 16px 80px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:800;font-size:clamp(2rem,6vw,3rem);margin:0 0 4px;letter-spacing:-.01em}
+h2{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.35rem;margin:34px 0 12px}
+.sub{color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.me{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+select,input,textarea,button{font:inherit;color:inherit}
+select,input,textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%}
+textarea{resize:vertical;min-height:60px}
+.me select{width:auto;min-width:140px}
+button{cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:9px 14px;font-weight:600;white-space:nowrap}
+button.ghost{background:transparent;color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.allergies{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.allergy{background:var(--warn);border:1px solid var(--warn-line);border-radius:12px;padding:12px}
+.allergy b{display:block;margin-bottom:6px}
+.allergy .txt{white-space:pre-wrap;min-height:1.5em}
+.allergy .txt.empty{color:var(--muted);font-style:italic}
+.allergy .edit{margin-top:8px;font-size:.85rem;padding:5px 10px}
+.cat{margin-top:22px}
+.cat h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px}
+.item{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:8px}
+.item.claimed{background:var(--claimed);border-color:var(--claimed-line)}
+.item .name{font-weight:600}
+.item .who{font-size:.92rem;color:var(--muted)}
+.item .note{font-size:.92rem;margin-top:2px;white-space:pre-wrap}
+.item .actions{display:flex;gap:6px;flex-shrink:0}
+.claimbox{margin-top:10px;display:grid;gap:8px}
+.add{display:grid;grid-template-columns:2fr 1fr auto;gap:8px}
+@media (max-width:560px){.add{grid-template-columns:1fr}}
+.status{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
+.status.show{opacity:1}
+.err{background:#fde2e0;color:#7a1d14;border:1px solid #f1b3ab;border-radius:12px;padding:12px;margin-bottom:16px;display:none}
+.setup{text-align:center;padding:40px 16px}
+.share{display:flex;gap:8px;margin-top:14px}
+.small{font-size:.85rem;color:var(--muted)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Friendsgiving Potluck</h1>
+  <p class="sub">Pick what your family is bringing. Everyone sees the same list.</p>
+  <div class="err" id="err"></div>
+
+  <div id="setup" class="card setup hidden">
+    <p><b>First-time setup.</b> Click once to create your sign-up board.</p>
+    <button id="createBtn">Create the sign-up board</button>
+    <div id="shareBox" class="hidden">
+      <p style="margin-top:20px">Done. Send <b>this exact link</b> to the group. It includes your board's ID.</p>
+      <div class="share"><input id="shareLink" readonly><button id="copyBtn">Copy</button></div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="card me">
+      <span>I am:</span>
+      <select id="meSel"><option value="">Choose your family</option></select>
+      <span class="small" id="mine"></span>
+    </div>
+
+    <h2>Allergies</h2>
+    <div class="allergies" id="allergies"></div>
+
+    <h2>Food</h2>
+    <div id="list"></div>
+
+    <h2>Add something that isn't listed</h2>
+    <div class="card">
+      <div class="add">
+        <input id="newName" placeholder="Dish name">
+        <select id="newCat"></select>
+        <button id="addBtn">Add</button>
+      </div>
+    </div>
+    <p class="small" style="margin-top:24px">The list refreshes every 15 seconds.</p>
+  </div>
+</div>
+<div class="status" id="status"></div>
+
+<script>
+const API = "https://jsonblob.com/api/jsonBlob";
+const PARTIES = ["M&J","H&K","K&L","J&C"];
+const CATS = ["Mains","Sides","Bread","Desserts","Kids","Drinks","Supplies"];
+const SEED = [
+  ["Turkey","Mains"],["Ham","Mains"],
+  ["Mashed potatoes","Sides"],["Gravy","Sides"],["Stuffing","Sides"],["Green bean casserole","Sides"],
+  ["Mac and cheese","Sides"],["Sweet potato casserole","Sides"],["Cranberry sauce","Sides"],["Salad","Sides"],["Roasted vegetables","Sides"],
+  ["Dinner rolls","Bread"],["Cornbread","Bread"],
+  ["Pumpkin pie","Desserts"],["Apple pie","Desserts"],["Pecan pie","Desserts"],["Whipped cream or ice cream","Desserts"],
+  ["Kid-friendly main (nuggets, pizza)","Kids"],["Fruit tray","Kids"],["Cookies or cupcakes","Kids"],
+  ["Wine or beer","Drinks"],["Juice boxes or kids' drinks","Drinks"],["Sparkling water and soda","Drinks"],
+  ["Plates, cups, napkins, utensils","Supplies"],["Ice","Supplies"]
+];
+
+const $ = id => document.getElementById(id);
+let blobId = location.hash.replace("#","").trim();
+let data = null;
+let openClaim = null;
+let busy = false;
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function uid(){return Math.random().toString(36).slice(2,10)}
+function getMe(){try{return localStorage.getItem("fg_me")||""}catch(e){return ""}}
+function setMe(v){try{localStorage.setItem("fg_me",v)}catch(e){}}
+function toast(msg){const s=$("status");s.textContent=msg;s.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>s.classList.remove("show"),1800)}
+function showErr(msg){const e=$("err");e.textContent=msg;e.style.display=msg?"block":"none"}
+
+function seedData(){
+  const allergies={};PARTIES.forEach(p=>allergies[p]="");
+  return {allergies,items:SEED.map(([name,cat])=>({id:uid(),name,cat,party:"",note:""}))};
+}
+
+async function load(){
+  const r=await fetch(API+"/"+blobId,{headers:{Accept:"application/json"},cache:"no-store"});
+  if(!r.ok) throw new Error("load "+r.status);
+  return r.json();
+}
+async function save(d){
+  const r=await fetch(API+"/"+blobId,{method:"PUT",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(d)});
+  if(!r.ok) throw new Error("save "+r.status);
+}
+// Always re-read the latest copy before changing it, so two families saving at once don't wipe each other out.
+async function mutate(fn,msg){
+  if(busy) return; busy=true;
+  try{
+    const fresh=await load(); fn(fresh); await save(fresh); data=fresh; showErr(""); render(); if(msg) toast(msg);
+  }catch(e){showErr("Couldn't save. Check your connection and try again.")}
+  finally{busy=false}
+}
+
+function render(){
+  if(!data) return;
+  const me=getMe();
+  // allergies
+  $("allergies").innerHTML=PARTIES.map(p=>{
+    const t=(data.allergies||{})[p]||"";
+    return `<div class="allergy" data-p="${esc(p)}"><b>${esc(p)}</b>
+      <div class="txt ${t?"":"empty"}">${t?esc(t):"No allergies listed yet"}</div>
+      <button class="ghost edit" data-edit-allergy="${esc(p)}">Edit</button></div>`;
+  }).join("");
+  // items
+  const items=data.items||[];
+  $("list").innerHTML=CATS.map(cat=>{
+    const rows=items.filter(i=>i.cat===cat);
+    if(!rows.length) return "";
+    return `<div class="cat"><h3>${esc(cat)}</h3>${rows.map(i=>itemHtml(i,me)).join("")}</div>`;
+  }).join("");
+  const mineCount=items.filter(i=>i.party&&i.party===me).length;
+  $("mine").textContent=me?`You're bringing ${mineCount} item${mineCount===1?"":"s"}.`:"";
+}
+
+function itemHtml(i,me){
+  if(i.party){
+    const isMine=i.party===me;
+    return `<div class="item claimed"><div><div class="name">${esc(i.name)}</div>
+      <div class="who">${esc(i.party)} is bringing this</div>
+      ${i.note?`<div class="note">${esc(i.note)}</div>`:""}</div>
+      <div class="actions">${isMine?`<button class="ghost" data-release="${i.id}">Unclaim</button>`:""}</div></div>`;
+  }
+  const open=openClaim===i.id;
+  return `<div class="item"><div style="flex:1"><div class="name">${esc(i.name)}</div>
+    ${open?`<div class="claimbox"><textarea id="note_${i.id}" placeholder="Optional note (e.g., nut-free, gluten-free, double batch)"></textarea>
+      <div style="display:flex;gap:8px"><button data-confirm="${i.id}">Confirm</button><button class="ghost" data-cancel>Cancel</button></div></div>`:""}
+    </div>${open?"":`<div class="actions"><button data-claim="${i.id}">I'll bring it</button></div>`}</div>`;
+}
+
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;
+  const me=getMe();
+  if(t.dataset.claim){ if(!me){showErr("Choose your family at the top first.");$("meSel").focus();return} showErr(""); openClaim=t.dataset.claim; render(); const n=$("note_"+openClaim); if(n) n.focus(); }
+  else if(t.dataset.cancel!==undefined){ openClaim=null; render(); }
+  else if(t.dataset.confirm){
+    const id=t.dataset.confirm, note=($("note_"+id)?.value||"").trim(); openClaim=null;
+    mutate(d=>{const it=d.items.find(x=>x.id===id); if(!it) return; if(it.party&&it.party!==me){showErr(`${it.party} just claimed that one.`);return} it.party=me; it.note=note;},"Saved");
+  }
+  else if(t.dataset.release){
+    const id=t.dataset.release;
+    mutate(d=>{const it=d.items.find(x=>x.id===id); if(it){it.party="";it.note=""}},"Unclaimed");
+  }
+  else if(t.dataset.editAllergy){
+    const p=t.dataset.editAllergy, box=t.parentElement, cur=(data.allergies||{})[p]||"";
+    box.innerHTML=`<b>${esc(p)}</b><textarea>${esc(cur)}</textarea><div style="display:flex;gap:6px;margin-top:6px"><button data-save-allergy="${esc(p)}">Save</button><button class="ghost" data-cancel>Cancel</button></div>`;
+    box.querySelector("textarea").focus();
+  }
+  else if(t.dataset.saveAllergy){
+    const p=t.dataset.saveAllergy, v=t.parentElement.parentElement.querySelector("textarea").value.trim();
+    mutate(d=>{d.allergies=d.allergies||{}; d.allergies[p]=v},"Allergies saved");
+  }
+});
+
+$("addBtn").onclick=()=>{
+  const name=$("newName").value.trim(), cat=$("newCat").value; if(!name) return;
+  $("newName").value="";
+  mutate(d=>{d.items.push({id:uid(),name,cat,party:"",note:""})},"Added");
+};
+$("newName").addEventListener("keydown",e=>{if(e.key==="Enter")$("addBtn").click()});
+$("meSel").onchange=e=>{setMe(e.target.value);showErr("");render()};
+
+// first-time setup
+$("createBtn").onclick=async()=>{
+  $("createBtn").disabled=true;
+  try{
+    const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(seedData())});
+    if(!r.ok) throw new Error(r.status);
+    const loc=r.headers.get("Location")||r.headers.get("location")||"";
+    let id=loc.split("/").pop();
+    if(!id) throw new Error("no id");
+    const link=location.href.split("#")[0]+"#"+id;
+    $("shareLink").value=link; $("shareBox").classList.remove("hidden"); $("createBtn").classList.add("hidden");
+    history.replaceState(null,"","#"+id);
+    $("copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText(link);toast("Link copied")}catch(e){$("shareLink").select()}};
+    const go=document.createElement("button");go.className="ghost";go.textContent="Open the board";go.style.marginTop="14px";
+    go.onclick=()=>location.reload();$("shareBox").appendChild(go);
+  }catch(e){$("createBtn").disabled=false;showErr("Setup failed. Try again in a minute.")}
+};
+
+async function start(){
+  PARTIES.forEach(p=>{const o=document.createElement("option");o.value=p;o.textContent=p;$("meSel").appendChild(o)});
+  CATS.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;$("newCat").appendChild(o)});
+  $("meSel").value=getMe();
+  if(!blobId){$("setup").classList.remove("hidden");return}
+  $("app").classList.remove("hidden");
+  try{data=await load();render()}catch(e){showErr("Couldn't load the list. Make sure you used the full link you were sent.")}
+  setInterval(async()=>{ if(busy||openClaim||document.querySelector(".allergy textarea")) return; try{data=await load();showErr("");render()}catch(e){} },15000);
+}
+window.addEventListener("hashchange",()=>location.reload());
+start();
+</script>
+</body>
+</html>
